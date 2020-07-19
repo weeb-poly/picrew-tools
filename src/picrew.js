@@ -12,36 +12,38 @@ const pipeline = util.promisify(stream.pipeline);
 
 // https://picrew.me/image_maker/{imgMakerId}
 const imgMakerId = '17250';
+const relKey = '';
 
 async function getRelKey(imgMakerId) {
-    // $("#image-maker > play-view-container-component").attr("release-key")
+    if (relKey !== '') return relKey;
     const response = await got(`https://picrew.me/image_maker/${imgMakerId}`);
     const $ = cheerio.load(response.body);
-    return $("#image-maker > play-view-container-component").attr("release-key");
+    return $("#image-maker > image-maker-component").attr("release-key");
 }
 
 async function getImgConf(imgMakerId, relKey) {
     // Important to match config with cdn urls
-    const resp = await got(`https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/img.json`).json();
-    return resp;
+    return await fs.promises.readFile(`./data/picrew.img.data.${imgMakerId}.json`)
+    .then(resp => JSON.parse(resp))
+    .catch(() => got(`https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/img.json`).json());
 }
 
 async function gettCfConf(imgMakerId, relKey) {
     // cpList is for the color pallete (not useful for this use case)
     // lyrList might be useful (contains layer order, but needs key for imgconf)
-    const resp = await got(`https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/cf.json`).json();
-    return resp;
+    return await fs.promises.readFile(`./data/picrew.cf.data.${imgMakerId}.json`)
+    .then(resp => JSON.parse(resp))
+    .catch(() => got(`https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/cf.json`).json());
 }
 
 async function getLocalData(imgMakerId) {
-    // Json file is from localstorage `copy(localStorage.getItem('picrew.local.data.{imgMakerId}'))`
-    const resp = await fs.promises.readFile(`picrew.local.data.${imgMakerId}.json`);
-    return JSON.parse(resp);
+    // Json file is from localstorage `copy(localStorage.getItem(`picrew.local.data.{imgMakerId}`))`
+    return await fs.promises.readFile(`./data/picrew.local.data.${imgMakerId}.json`)
+    .then(resp => JSON.parse(resp));
 }
 
 async function downloadFile(fullUrl) {
-    const parsed = url.parse(fullUrl);
-    const fname = path.basename(parsed.pathname);
+    const fname = './imgs/' + path.basename(fullUrl);
     await pipeline(
         got.stream(fullUrl),
         fs.createWriteStream(fname)
@@ -52,8 +54,7 @@ async function dlPicrewItems(local_data, imgMakerId) {
     const relKey = await getRelKey(imgMakerId);
     const { baseUrl, lst } = await getImgConf(imgMakerId, relKey);
 
-    for (const entry of Object.values(local_data)) {
-        const { itmId, cId } = entry;
+    for (const { itmId, cId } of Object.values(local_data)) {
         if (itmId === 0) continue;
         const url = Object.values(lst[itmId])[0][cId]['url'];
         const fullUrl = baseUrl + url;
