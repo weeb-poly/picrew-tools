@@ -62,6 +62,21 @@ async function dlPicrewItems(local_data, imgMakerId) {
     }
 }
 
+async function dlAllPicrewItems(imgMakerId) {
+    const relKey = await getRelKey(imgMakerId);
+    const { baseUrl, lst } = await getImgConf(imgMakerId, relKey);
+
+    for (const l1 of Object.values(lst)) {
+        for (const l2 of Object.values(l1)) {
+            for (const l3 of Object.values(l2)) {
+                const url = l3['url'];
+                const fullUrl = baseUrl + url;
+                await downloadFile(fullUrl);
+            }
+        }
+    }
+}
+
 async function addPicrewMeta(local_data) {
     const str_data = JSON.stringify(local_data);
     await pipeline(
