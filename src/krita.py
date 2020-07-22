@@ -1,7 +1,8 @@
 import json
+from pathlib import Path
 from krita import *
 
-toolspath = "C:/Users/timhc/Downloads/../Documents/GitHub/picrew-tools/"
+toolspath = Path.home().joinpath('Documents', 'GitHub', 'picrew-tools').as_posix()
 imgId = "17250"
 
 inst = Krita.instance()
