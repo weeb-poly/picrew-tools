@@ -14,6 +14,8 @@ const pipeline = util.promisify(stream.pipeline);
 const imgMakerId = '17250';
 const relKey = '';
 
+const cacheFiles = false;
+
 async function getRelKey(imgMakerId) {
     if (relKey !== '') return relKey;
     const response = await got(`https://picrew.me/image_maker/${imgMakerId}`);
@@ -21,25 +23,54 @@ async function getRelKey(imgMakerId) {
     return $("#image-maker > image-maker-component").attr("release-key");
 }
 
+async function getPicrewDataFile(filePath, url = '') {
+    // Used to load picrew data files as well as optional
+    // caching to avoid scraping detection (these files don't
+    // change unless the picrew gets updated)
+    try {
+        return await fs.promises.readFile(filePath).then(resp => JSON.parse(resp));
+    } catch (_err) {
+        if (url === '') {
+            return Promise.reject(_err);
+        }
+        const res = await got(url).json();
+        if (cacheFiles) {
+            await fs.promises.writeFile(filePath, JSON.stringify(res));
+        }
+        return res;
+    }
+}
+
 async function getImgConf(imgMakerId, relKey) {
     // Important to match config with cdn urls
-    return await fs.promises.readFile(`./data/picrew.img.data.${imgMakerId}.json`)
-    .then(resp => JSON.parse(resp))
-    .catch(() => got(`https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/img.json`).json());
+    return await getPicrewDataFile(
+        `./data/picrew.img.data.${imgMakerId}.json`,
+        `https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/img.json`
+    );
 }
 
 async function gettCfConf(imgMakerId, relKey) {
     // cpList is for the color pallete (not useful for this use case)
     // lyrList might be useful (contains layer order, but needs key for imgconf)
-    return await fs.promises.readFile(`./data/picrew.cf.data.${imgMakerId}.json`)
-    .then(resp => JSON.parse(resp))
-    .catch(() => got(`https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/cf.json`).json());
+    return await getPicrewDataFile(
+        `./data/picrew.cf.data.${imgMakerId}.json`,
+        `https://cdn.picrew.me/app/image_maker/${imgMakerId}/${relKey}/cf.json`
+    );
 }
 
 async function getLocalData(imgMakerId) {
-    // Json file is from localstorage `copy(localStorage.getItem(`picrew.local.data.{imgMakerId}`))`
-    return await fs.promises.readFile(`./data/picrew.local.data.${imgMakerId}.json`)
-    .then(resp => JSON.parse(resp));
+    // Json file is from localstorage
+    // Use console.save (http://bgrins.github.io/devtools-snippets/#console-save)
+    /**
+     * console.save(
+     *   localStorage.getItem(`picrew.local.data.${imgMakerId}`),
+     *   `picrew.local.data.${imgMakerId}.json`
+     * )
+     */
+    return await getPicrewDataFile(
+        `./data/picrew.local.data.${imgMakerId}.json`,
+        ''
+    );
 }
 
 async function downloadFile(fullUrl) {
@@ -78,6 +109,7 @@ async function dlAllPicrewItems(imgMakerId) {
 }
 
 async function addPicrewMeta(local_data) {
+    // untested and shouldn't be relied upon
     const str_data = JSON.stringify(local_data);
     await pipeline(
         fs.createReadStream('input.png'),
